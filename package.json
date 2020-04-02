@@ -1,6 +1,6 @@
 {
   "name": "rtc-relay",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Relay socket messages over rtc",
   "main": "app.js",
   "scripts": {
