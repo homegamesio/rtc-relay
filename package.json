@@ -1,0 +1,23 @@
+{
+  "name": "rtc-relay",
+  "version": "0.0.1",
+  "description": "Relay socket messages over rtc",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/homegamesio/rtc-relay.git"
+  },
+  "keywords": [
+    "rtc",
+    "relay"
+  ],
+  "author": "Joseph Garcia",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/homegamesio/rtc-relay/issues"
+  },
+  "homepage": "homegames.io"
+}
