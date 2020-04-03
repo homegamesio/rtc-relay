@@ -1,11 +1,12 @@
 class RTCRelay {
-    constructor(socketUrl, onOpen, onMessage, binaryType) {
+    constructor(socketUrl, onOpen, onMessage, binaryType, forceSocket = false) {
         this.connections = {};
         this.channels = [];
         this.onOpen = onOpen;
         this.onMessage = onMessage;
         this.socket = new WebSocket(socketUrl);
         this.binaryType = binaryType;
+        this.transportType = null;
 
         if (this.binaryType) {
             this.socket.binaryType = this.binaryType;
@@ -16,14 +17,27 @@ class RTCRelay {
             if (isHost) {
                 this.listenForConnections();
                 this.socket.send('ready');
+                this.transportType = 'socket';
                 this.onOpen && this.onOpen();
             } else {
-                this.makePeerRequest().then(success => {
-                    if (!success) {
-                        this.socket.send('ready');
-                    }
+                if (!forceSocket) {
+                    this.makePeerRequest().then(success => {
+                        if (!success) {
+                            this.socket.send('ready');
+                        }
+    
+                        this.transportType = success ? 'rtc' : 'socket';
+                        this.onOpen && this.onOpen();
+                    });
+                } else {
+                    this.socket.send('ready');
+                    this.transportType = 'socket';
+                    this.socket.onmessage = (msg) => {
+                        this.onMessage && this.onMessage(msg.data);
+                    };
                     this.onOpen && this.onOpen();
-                });
+
+                }
             }
         };
     }
@@ -65,7 +79,7 @@ class RTCRelay {
                         this.socket.send(JSON.stringify(offerMessage));
                     };
             
-                    const dataChannel = thing.createDataChannel('homegames');
+                    const dataChannel = thing.createDataChannel('dataChannel');
 
                     dataChannel.onopen = () => {
                         this.channels.push(dataChannel);
@@ -91,7 +105,11 @@ class RTCRelay {
                 }
             } else {
                 for (let channelIndex in this.channels) {
-                    this.channels[channelIndex].send(msg.data)
+                    if (this.channels[channelIndex].readyState === 'open') {
+                        this.channels[channelIndex].send(msg.data);
+                    } else {
+                        delete this.channels[channelIndex];
+                    }
                 }
                 this.onMessage && this.onMessage(msg.data);
             }
@@ -99,6 +117,9 @@ class RTCRelay {
     }
 
     makePeerRequest() {
+
+        let channelInitTimeout;
+
         return new Promise((resolve, reject) => {
             this.socket.onmessage = (msg) => {
                 const data = JSON.parse(msg.data);
@@ -108,8 +129,16 @@ class RTCRelay {
                     connection.onicecandidate = (e) => {
                         this.socket.send(JSON.stringify(connection.localDescription));
                     };
+
+                    if (!channelInitTimeout) {
+                        channelInitTimeout = setTimeout(() => {
+                            console.warn("Timed out waiting for RTC data channel");
+                            resolve(false);
+                        }, 5000);
+                    }
     
                     connection.ondatachannel = (e) => {
+                        clearTimeout(channelInitTimeout);
                         const chan = e.channel || e;
     
                         if (this.binaryType) {
@@ -119,6 +148,7 @@ class RTCRelay {
                         chan.onmessage = (msg) => {
                             this.onMessage && this.onMessage(msg.data);
                         };
+
                         resolve(true);
                     };
         
